@@ -1,0 +1,5 @@
+main
+*.log
+.DS_Store
+*.db
+

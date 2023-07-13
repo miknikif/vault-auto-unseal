@@ -1,0 +1,4 @@
+*.db
+Dockerfile
+.DS_Store
+*.log
