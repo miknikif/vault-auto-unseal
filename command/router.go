@@ -119,7 +119,7 @@ func encryptWithTransitKey(w http.ResponseWriter, r *http.Request) {
 		render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
-	ct, err := encryptData(key.keys[0], data)
+	ct, err := encryptData(key.keys[1], data)
 
 	if err != nil {
 		render.Render(w, r, ErrRender(err))
@@ -139,7 +139,7 @@ func decryptWithTransitKey(w http.ResponseWriter, r *http.Request) {
 		render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
-	pt, err := decryptData(key.keys[0], data)
+	pt, err := decryptData(key.keys[1], data)
 
 	if err != nil {
 		render.Render(w, r, ErrRender(err))
