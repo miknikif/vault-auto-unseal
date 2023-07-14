@@ -178,7 +178,6 @@ func delAESKeyFromDB(key InternalKey) error {
 	}
 	dbconn.lock.Lock()
 	defer dbconn.lock.Unlock()
-	fmt.Println(key.id)
 	_, err = dbconn.db.Exec("DELETE FROM aes_keys WHERE id = ?", key.id)
 	if err != nil {
 		return err
@@ -198,6 +197,5 @@ func dbGetKey(name string) (Key, error) {
 		sik[i+1] = ik
 	}
 	k := Key{Name: name, LatestVersion: versions[len(versions)-1], Type: KEY_TYPE_AES256_GCM96, keys: sik}
-	fmt.Println(k.keys)
 	return k, nil
 }
