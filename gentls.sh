@@ -24,6 +24,8 @@ prompt = no
 CN  = localhost
 [req_ext]
 subjectAltName = @alt_names
+[v3_req]
+subjectAltName = @alt_names
 [alt_names]
 DNS.1 = localhost
 IP.1 = 127.0.0.1
@@ -42,6 +44,7 @@ extendedKeyUsage = serverAuth
 subjectAltName = @alt_names
 [alt_names]
 DNS.1 = localhost
+IP.1 = 127.0.0.1
 EOF
 
 openssl x509 -req -sha512 -days 365 -in tls/tls.csr -CA tls/ca.crt -CAkey tls/ca.key -CAcreateserial -out tls/tls.crt -extfile tls/tls-ext.conf

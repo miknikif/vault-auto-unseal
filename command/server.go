@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/miknikif/vault-auto-unseal/common"
-	"github.com/miknikif/vault-auto-unseal/health"
 	"github.com/miknikif/vault-auto-unseal/keys"
+	"github.com/miknikif/vault-auto-unseal/sys"
 )
 
 // Migrate provided DB
@@ -33,7 +33,7 @@ func StartHttpServer() error {
 	router := gin.Default()
 
 	v1 := router.Group("/v1")
-	health.HealthRegister(v1.Group("/"))
+	sys.HealthRegister(v1.Group("/sys"))
 	keys.KeysRegister(v1.Group("/transit/keys"))
 
 	server := &http.Server{

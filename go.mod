@@ -6,11 +6,11 @@ replace github.com/miknikif/vault-auto-unseal/command => ./command
 
 replace github.com/miknikif/vault-auto-unseal/common => ./common
 
-replace github.com/miknikif/vault-auto-unseal/health => ./health
-
 replace github.com/miknikif/vault-auto-unseal/helper => ./helper
 
 replace github.com/miknikif/vault-auto-unseal/keys => ./keys
+
+replace github.com/miknikif/vault-auto-unseal/sys => ./sys
 
 require (
 	github.com/hashicorp/go-hclog v1.5.0
