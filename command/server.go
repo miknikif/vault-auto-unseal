@@ -2,9 +2,11 @@ package command
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/miknikif/vault-auto-unseal/common"
+	"github.com/miknikif/vault-auto-unseal/health"
 	"github.com/miknikif/vault-auto-unseal/keys"
 )
 
@@ -24,14 +26,36 @@ func StartHttpServer() error {
 	Migrate(c)
 	defer c.DB.Close()
 
-	r := gin.Default()
-	v1 := r.Group("/v1")
+	if c.Args.IsProduction {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	router := gin.Default()
+
+	v1 := router.Group("/v1")
+	health.HealthRegister(v1.Group("/"))
 	keys.KeysRegister(v1.Group("/transit/keys"))
-	v1.Group("/liveness").GET("", common.LivenessCheck)
-	v1.Group("/readiness").GET("", common.ReadinessCheck)
 
-	c.Logger.Info(fmt.Sprintf("Starting HTTP server at %s://%s:%d", c.Args.TLS.Proto, c.Args.Host, c.Args.Port))
-	r.Run(fmt.Sprintf("%s:%d", c.Args.Host, c.Args.Port))
+	server := &http.Server{
+		Addr:     fmt.Sprintf("%s:%d", c.Args.Host, c.Args.Port),
+		Handler:  router,
+		ErrorLog: c.Logger.StandardLogger(nil),
+	}
 
+	if c.TLS != nil {
+		server.TLSConfig = c.TLS.TLSConfig
+		fmt.Println(c.TLS.BundleCrt)
+		c.Logger.Info(fmt.Sprintf("Starting HTTPS server at https://%s:%d", c.Args.Host, c.Args.Port))
+		err = server.ListenAndServeTLS(c.TLS.BundleCrt, c.TLS.TLSKey)
+		if err != nil {
+			return err
+		}
+	} else {
+		c.Logger.Info(fmt.Sprintf("Starting HTTP server at http://%s:%d", c.Args.Host, c.Args.Port))
+		err = server.ListenAndServe()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -1,8 +1,11 @@
 package common
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"sync"
 
@@ -15,27 +18,20 @@ import (
 // All currently used ENV VARS
 // Used in the following form: <ENV_PREFIX>_<ENV_VAR>
 const (
-	ENV_PREFIX     = "VAULT_AUTO_UNSEAL"
-	ENV_HOST       = "HOST"
-	ENV_PORT       = "PORT"
-	ENV_TLS_CA_CRT = "CA_CRT"
-	ENV_TLS_CRT    = "TLS_CRT"
-	ENV_TLS_KEY    = "TLS_KEY"
-	ENV_DB_PATH    = "DB_PATH"
-	ENV_DB_NAME    = "DB_NAME"
-	ENV_LOG_FORMAT = "LOG_FORMAT"
-	ENV_LOG_LEVEL  = "LOG_LEVEL"
+	ENV_HOSTNAME               = "HOSTNAME"
+	ENV_PREFIX                 = "VAULT_AUTO_UNSEAL"
+	ENV_HOST                   = "HOST"
+	ENV_PORT                   = "PORT"
+	ENV_TLS_CA_CRT_PATH        = "CA_CRT_PATH"
+	ENV_TLS_CLIENT_CA_CRT_PATH = "CLIENT_CA_CRT_PATH"
+	ENV_TLS_CRT_PATH           = "TLS_CRT_PATH"
+	ENV_TLS_KEY_PATH           = "TLS_KEY_PATH"
+	ENV_DB_PATH                = "DB_PATH"
+	ENV_DB_NAME                = "DB_NAME"
+	ENV_LOG_FORMAT             = "LOG_FORMAT"
+	ENV_LOG_LEVEL              = "LOG_LEVEL"
+	ENV_PRODUCTION             = "PRODUCTION"
 )
-
-// TLS Specific configuration provided during startup
-// TODO: watch for the certificate changes to restart the app/listener
-type TLSConfig struct {
-	Enabled bool
-	Proto   string // Can be http or https. We're setting this automatically based on Enabled field
-	CACrt   string
-	TLSCrt  string
-	TLSKey  string
-}
 
 // Log specific configuration provided during startup
 type LogConfig struct {
@@ -47,18 +43,28 @@ type LogConfig struct {
 // This struct is inialized only once, during startup
 // It's should remain unchanged
 type Params struct {
-	Host      string
-	Port      int
-	TLS       *TLSConfig
-	DBPath    string
-	DBName    string
-	LogConfig *LogConfig
+	Host         string
+	Port         int
+	DBPath       string
+	DBName       string
+	IsProduction bool
+	LogConfig    *LogConfig
+}
+
+// TLS conf
+type TLSConfig struct {
+	TLSConfig *tls.Config
+	BundleCrt string
+	CACrt     string
+	TLSCrt    string
+	TLSKey    string
 }
 
 // App Config Struct
 type Config struct {
 	Lock   sync.RWMutex
 	Args   *Params
+	TLS    *TLSConfig
 	Logger hclog.Logger
 	DB     *gorm.DB
 }
@@ -91,43 +97,123 @@ func (c *Config) configureLogging() error {
 	return nil
 }
 
+// Configure TLS
+func (c *Config) configureTLS() error {
+	tlsEnabled := false
+	hostname := readEnv(ENV_HOSTNAME, "vau-server")
+	tlsCAPath := readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_CA_CRT_PATH), "")
+	tlsClientCAPath := readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_CLIENT_CA_CRT_PATH), "")
+	tlsCRTPath := readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_CRT_PATH), "")
+	tlsKeyPath := readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_KEY_PATH), "")
+
+	tlsConfig := &TLSConfig{}
+
+	t := &tls.Config{
+		ServerName:               hostname,
+		PreferServerCipherSuites: true,
+		MinVersion:               tls.VersionTLS12,
+		ClientAuth:               tls.NoClientCert,
+	}
+
+	// Load custom CA to the store
+	if fileExists(tlsCAPath) {
+		crt, err := ioutil.ReadFile(tlsCAPath)
+		if err != nil {
+			return err
+		}
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(crt)
+		t.RootCAs = certPool
+		tlsConfig.CACrt = tlsCAPath
+	}
+
+	// Load custom client CA to the store
+	if fileExists(tlsClientCAPath) {
+		crt, err := ioutil.ReadFile(tlsClientCAPath)
+		if err != nil {
+			return err
+		}
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(crt)
+		t.ClientCAs = certPool
+		t.ClientAuth = tls.RequireAndVerifyClientCert
+	}
+
+	// Load server certificate
+	if fileExists(tlsCRTPath) && fileExists(tlsKeyPath) {
+		tlsEnabled = true
+		bundleCrt := tlsCRTPath
+
+		if fileExists(tlsCAPath) {
+			f, err := os.CreateTemp(os.TempDir(), "vau-crt")
+			if err != nil {
+				return err
+			}
+
+			caCrt, err := ioutil.ReadFile(tlsCAPath)
+			if err != nil {
+				return err
+			}
+
+			tlsCrt, err := ioutil.ReadFile(tlsCRTPath)
+			if err != nil {
+				return err
+			}
+
+			_, err = f.Write(tlsCrt)
+			if err != nil {
+				return err
+			}
+			_, err = f.Write(caCrt)
+			if err != nil {
+				return err
+			}
+			bundleCrt = f.Name()
+		}
+
+		crt, err := tls.LoadX509KeyPair(bundleCrt, tlsKeyPath)
+		if err != nil {
+			return err
+		}
+
+		t.Certificates = []tls.Certificate{crt}
+		tlsConfig.BundleCrt = bundleCrt
+		tlsConfig.TLSCrt = tlsCRTPath
+		tlsConfig.TLSKey = tlsKeyPath
+	}
+
+	if tlsEnabled {
+		tlsConfig.TLSConfig = t
+		c.TLS = tlsConfig
+	}
+
+	return nil
+}
+
 // Read all supported ENV Vars
 func (c *Config) readEnv() error {
-	tlsEnabled := false
-	tlsProto := "http"
-	tlsKey := readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_KEY), "")
-
-	if tlsKey != "" {
-		tlsEnabled = true
-		tlsProto = "https"
-	}
-
-	t := &TLSConfig{
-		Enabled: tlsEnabled,
-		Proto:   tlsProto,
-		CACrt:   readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_CA_CRT), ""),
-		TLSCrt:  readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_TLS_CRT), ""),
-		TLSKey:  tlsKey,
-	}
-
 	log := &LogConfig{
 		LogFormat: readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_LOG_FORMAT), "standard"),
 		LogLevel:  readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_LOG_LEVEL), "info"),
 	}
 
 	cp := &Params{
-		TLS:       t,
-		LogConfig: log,
-		Host:      readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_HOST), "0.0.0.0"),
-		Port:      readEnvInt(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_PORT), 8200),
-		DBPath:    readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_DB_PATH), "."),
-		DBName:    readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_DB_NAME), "vaseal.db"),
+		LogConfig:    log,
+		Host:         readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_HOST), "0.0.0.0"),
+		Port:         readEnvInt(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_PORT), 8200),
+		DBPath:       readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_DB_PATH), "."),
+		DBName:       readEnv(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_DB_NAME), "vaseal.db"),
+		IsProduction: readEnvBool(fmt.Sprintf("%s_%s", ENV_PREFIX, ENV_PRODUCTION), true),
 	}
 
 	c.Lock.Lock()
 	defer c.Lock.Unlock()
 	c.Args = cp
 	err := c.configureLogging()
+	if err != nil {
+		return err
+	}
+	err = c.configureTLS()
 	if err != nil {
 		return err
 	}

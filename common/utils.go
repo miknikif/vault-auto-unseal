@@ -8,11 +8,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"gopkg.in/go-playground/validator.v8"
-	"net/http"
 )
 
 // All currently used ENV VARS
 // Used in the following form: <ENV_PREFIX>_<ENV_VAR>
+
+// Helper function to check if file exists
+func fileExists(path string) bool {
+	res := false
+
+	if path == "" {
+		return res
+	}
+
+	_, err := os.Stat(path)
+	if err == nil {
+		res = true
+	}
+
+	return res
+}
 
 // Helper function to read ENV Var with optional default value
 func readEnv(key string, def string) string {
@@ -33,6 +48,16 @@ func readEnvInt(key string, def int) int {
 		i = def
 	}
 	return i
+}
+
+// Helper function to read BOOL parameter from the ENV
+func readEnvBool(key string, def bool) bool {
+	v := readEnv(key, fmt.Sprintf("%t", def))
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		b = def
+	}
+	return b
 }
 
 // My own Error type that will help return my customized Error info
@@ -67,26 +92,6 @@ func NewError(key string, err error) CommonError {
 	res.Errors = make(map[string]interface{})
 	res.Errors[key] = err.Error()
 	return res
-}
-
-// LivenessCheck
-func LivenessCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
-}
-
-// ReadinessCheck
-func ReadinessCheck(c *gin.Context) {
-	db, err := GetDB()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, NewError("status", err))
-		return
-	}
-	err = db.DB().Ping()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, NewError("status", err))
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func Bind(c *gin.Context, obj interface{}) error {
