@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"sync"
 
@@ -117,7 +116,7 @@ func (c *Config) configureTLS() error {
 
 	// Load custom CA to the store
 	if fileExists(tlsCAPath) {
-		crt, err := ioutil.ReadFile(tlsCAPath)
+		crt, err := os.ReadFile(tlsCAPath)
 		if err != nil {
 			return err
 		}
@@ -129,7 +128,7 @@ func (c *Config) configureTLS() error {
 
 	// Load custom client CA to the store
 	if fileExists(tlsClientCAPath) {
-		crt, err := ioutil.ReadFile(tlsClientCAPath)
+		crt, err := os.ReadFile(tlsClientCAPath)
 		if err != nil {
 			return err
 		}
@@ -150,12 +149,12 @@ func (c *Config) configureTLS() error {
 				return err
 			}
 
-			caCrt, err := ioutil.ReadFile(tlsCAPath)
+			caCrt, err := os.ReadFile(tlsCAPath)
 			if err != nil {
 				return err
 			}
 
-			tlsCrt, err := ioutil.ReadFile(tlsCRTPath)
+			tlsCrt, err := os.ReadFile(tlsCRTPath)
 			if err != nil {
 				return err
 			}
