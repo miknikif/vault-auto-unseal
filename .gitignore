@@ -4,3 +4,4 @@ main
 *.db
 old/
 tls/
+*.json

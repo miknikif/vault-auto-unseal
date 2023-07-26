@@ -1,13 +1,13 @@
 package common
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"gopkg.in/go-playground/validator.v8"
 )
 
 // All currently used ENV VARS
@@ -64,37 +64,54 @@ func readEnvBool(key string, def bool) bool {
 //
 //	{"database": {"hello":"no such table", error: "not_exists"}}
 type CommonError struct {
-	Errors map[string]interface{} `json:"errors"`
+	Errors []string `json:"errors"`
 }
 
 // To handle the error returned by c.Bind in gin framework
 // https://github.com/go-playground/validator/blob/v9/_examples/translations/main.go
-func NewValidatorError(err error) CommonError {
-	res := CommonError{}
-	res.Errors = make(map[string]interface{})
-	errs := err.(validator.ValidationErrors)
-	for _, v := range errs {
-		// can translate each error one at a time.
-		//fmt.Println("gg",v.NameNamespace)
-		if v.Param != "" {
-			res.Errors[v.Field] = fmt.Sprintf("{%v: %v}", v.Tag, v.Param)
-		} else {
-			res.Errors[v.Field] = fmt.Sprintf("{key: %v}", v.Tag)
-		}
-
-	}
-	return res
-}
+// func NewValidatorError(err error) CommonError {
+// 	res := CommonError{}
+// 	res.Errors = make(map[string]interface{})
+// 	errs := err.(validator.ValidationErrors)
+// 	for _, v := range errs {
+// 		// can translate each error one at a time.
+// 		//fmt.Println("gg",v.NameNamespace)
+// 		if v.Param != "" {
+// 			res.Errors[v.Field] = fmt.Sprintf("{%v: %v}", v.Tag, v.Param)
+// 		} else {
+// 			res.Errors[v.Field] = fmt.Sprintf("{key: %v}", v.Tag)
+// 		}
+//
+// 	}
+// 	return res
+// }
 
 // Warp the error info in a object
 func NewError(key string, err error) CommonError {
 	res := CommonError{}
-	res.Errors = make(map[string]interface{})
-	res.Errors[key] = err.Error()
+	res.Errors = []string{
+		fmt.Sprintf("%s: %s", key, err.Error()),
+	}
 	return res
 }
 
 func Bind(c *gin.Context, obj interface{}) error {
 	b := binding.Default(c.Request.Method, c.ContentType())
 	return c.ShouldBindWith(obj, b)
+}
+
+func EncToB64(str string) string {
+	src := []byte(str)
+	res := base64.StdEncoding.EncodeToString(src)
+	return res
+}
+
+func DecFromB64(str string) (string, error) {
+	b, err := base64.StdEncoding.DecodeString(str)
+	if err != nil {
+		return "", err
+	}
+
+	res := string(b)
+	return res, nil
 }

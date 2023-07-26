@@ -19,7 +19,7 @@ func KeysRegister(router *gin.RouterGroup) {
 func KeyCreate(c *gin.Context) {
 	keyModelValidator := NewKeyModelValidator()
 	if err := keyModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("keys", err))
 		return
 	}
 
@@ -56,7 +56,7 @@ func KeyUpdate(c *gin.Context) {
 	}
 	keyModelValidator := NewKeyModelValidatorFillWith(keyModel)
 	if err := keyModelValidator.Bind(c); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, common.NewValidatorError(err))
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("keys", err))
 		return
 	}
 

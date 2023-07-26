@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/miknikif/vault-auto-unseal/common"
 	"github.com/miknikif/vault-auto-unseal/keys"
+	"github.com/miknikif/vault-auto-unseal/policy"
 	"github.com/miknikif/vault-auto-unseal/sys"
 )
 
@@ -15,6 +16,8 @@ func Migrate(c *common.Config) {
 	c.Logger.Info(fmt.Sprintf("Migrating %s", c.Args.DBName))
 	c.DB.AutoMigrate(&keys.AESKeyModel{})
 	c.DB.AutoMigrate(&keys.KeyModel{})
+	c.DB.AutoMigrate(&policy.PolicyModel{})
+	c.Logger.Info(fmt.Sprintf("Migration of the %s DB completed", c.Args.DBName))
 }
 
 // Start HTTP Server
@@ -33,7 +36,11 @@ func StartHttpServer() error {
 	router := gin.Default()
 
 	v1 := router.Group("/v1")
+	v1.Use(common.JSONMiddleware(false))
+	v1.Use(common.RequestIDMiddleware())
 	sys.HealthRegister(v1.Group("/sys"))
+	policy.PolicyRegister(v1.Group("/sys/policy"))
+	policy.PolicyRegister(v1.Group("/sys/policies/acl"))
 	keys.KeysRegister(v1.Group("/transit/keys"))
 
 	server := &http.Server{
