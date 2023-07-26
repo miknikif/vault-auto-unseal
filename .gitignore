@@ -5,3 +5,4 @@ main
 old/
 tls/
 *.json
+*.hcl

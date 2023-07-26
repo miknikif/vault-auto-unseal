@@ -9,6 +9,7 @@ import (
 	"github.com/miknikif/vault-auto-unseal/keys"
 	"github.com/miknikif/vault-auto-unseal/policies"
 	"github.com/miknikif/vault-auto-unseal/sys"
+	"github.com/miknikif/vault-auto-unseal/tokens"
 )
 
 // Migrate provided DB
@@ -17,6 +18,7 @@ func Migrate(c *common.Config) {
 	c.DB.AutoMigrate(&keys.AESKeyModel{})
 	c.DB.AutoMigrate(&keys.KeyModel{})
 	c.DB.AutoMigrate(&policies.PolicyModel{})
+	c.DB.AutoMigrate(&tokens.TokenModel{})
 	c.Logger.Info(fmt.Sprintf("Migration of the %s DB completed", c.Args.DBName))
 }
 
@@ -38,6 +40,7 @@ func StartHttpServer() error {
 	v1 := router.Group("/v1")
 	v1.Use(common.JSONMiddleware(false))
 	v1.Use(common.RequestIDMiddleware())
+	tokens.TokenRegister(v1.Group("/auth/token"))
 	sys.HealthRegister(v1.Group("/sys"))
 	policies.PolicyRegister(v1.Group("/sys/policy"))
 	policies.PolicyRegister(v1.Group("/sys/policies/acl"))
