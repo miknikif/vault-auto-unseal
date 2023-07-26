@@ -11,4 +11,4 @@ serializers.go: definition the schema of return data
 
 validators.go: definition the validator of form data
 */
-package policy
+package policies

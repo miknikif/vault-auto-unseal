@@ -10,7 +10,7 @@ replace github.com/miknikif/vault-auto-unseal/helper => ./helper
 
 replace github.com/miknikif/vault-auto-unseal/keys => ./keys
 
-replace github.com/miknikif/vault-auto-unseal/policy => ./policy
+replace github.com/miknikif/vault-auto-unseal/policies => ./policies
 
 replace github.com/miknikif/vault-auto-unseal/sys => ./sys
 

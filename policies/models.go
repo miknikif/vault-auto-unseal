@@ -1,4 +1,4 @@
-package policy
+package policies
 
 import (
 	"github.com/jinzhu/gorm"
