@@ -1,7 +1,9 @@
 /*
 The keys module containing the keys CRUD operation and relationship CRUD
 
-model.go: definition of orm based data model
+hcl.go: Policy HCL Parser
+
+models.go: definition of orm based data model
 
 routers.go: router binding and core logic
 
