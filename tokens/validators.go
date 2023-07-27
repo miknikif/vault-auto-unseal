@@ -15,12 +15,17 @@ type TokenLookupModelValidator struct {
 	TokenID          string     `form:"token" json:"token"`
 	Accessor         string     `form:"accessor" json:"accessor"`
 	findWithAccessor bool       `json:"-"`
+	isSelf           bool       `json:"-"`
 	tokenModel       TokenModel `json:"-"`
 }
 
 func (s *TokenLookupModelValidator) Bind(c *gin.Context) error {
-	if err := common.Bind(c, s); err != nil {
-		return err
+	if !s.isSelf {
+		if err := common.Bind(c, s); err != nil {
+			return err
+		}
+	} else {
+		s.TokenID = c.GetString(VAULT_TOKEN)
 	}
 
 	s.tokenModel.TokenID = s.TokenID
@@ -35,19 +40,20 @@ func (s *TokenLookupModelValidator) Bind(c *gin.Context) error {
 	return nil
 }
 
-func NewTokenLookupModelValidator() TokenLookupModelValidator {
-	tokenLookupModelValidator := TokenLookupModelValidator{}
+func NewTokenLookupModelValidator(self bool) TokenLookupModelValidator {
+	tokenLookupModelValidator := TokenLookupModelValidator{
+		isSelf: self,
+	}
 	return tokenLookupModelValidator
 }
 
 func NewTokenLookupModelValidatorFillWith(tokenModel TokenModel) TokenLookupModelValidator {
-	tokenLookupModelValidator := NewTokenLookupModelValidator()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(false)
 	tokenLookupModelValidator.TokenID = tokenModel.TokenID
 	tokenLookupModelValidator.Accessor = tokenModel.Accessor
 	return tokenLookupModelValidator
 }
 
-// {"policies":["default"],"ttl":"0s","explicit_max_ttl":"0s","period":"24h0m0s","display_name":"","num_uses":0,"renewable":true,"type":"service","entity_alias":""}
 type TokenModelValidator struct {
 	Policies       []string   `json:"policies"`
 	TTL            string     `json:"ttl"`
@@ -70,7 +76,7 @@ func (s *TokenModelValidator) Bind(c *gin.Context) error {
 	for _, policy := range s.Policies {
 		pol, err := policies.FindOnePolicy(&policies.PolicyModel{Name: policy})
 		if err != nil {
-			return err
+			return fmt.Errorf("Policy %s not found", policy)
 		}
 		p = append(p, pol)
 	}
@@ -90,6 +96,14 @@ func (s *TokenModelValidator) Bind(c *gin.Context) error {
 	if strings.ToLower(s.Type) != TOKEN_TYPE_BATCH && strings.ToLower(s.Type) != TOKEN_TYPE_SERVICE {
 		return fmt.Errorf("token type should be one of the following: %s or %s", TOKEN_TYPE_SERVICE, TOKEN_TYPE_BATCH)
 	}
+	if int(ttl) == 0 && int(period) == 0 {
+		return fmt.Errorf("ttl and period cannot be 0")
+	} else if int(ttl) == 0 && int(period) > 0 {
+		ttl = period
+	}
+	if int(explicitMaxTTL) != 0 && int(period) > 0 {
+		return fmt.Errorf("explicit_max_ttl can be only 0 if period is specified")
+	}
 
 	s.tokenModel.Policies = p
 	s.tokenModel.CreationTTL = int(ttl.Seconds())
@@ -100,7 +114,7 @@ func (s *TokenModelValidator) Bind(c *gin.Context) error {
 	s.tokenModel.Renewable = s.Renewable
 	s.tokenModel.Type = strings.ToLower(s.Type)
 	s.tokenModel.EntityID = s.EntityAlias
-	s.tokenModel.CreationTime = int(time.Now().Unix())
+	s.tokenModel.CreationTime = time.Now()
 	s.tokenModel.Path = c.FullPath()
 	s.tokenModel.ExpireTime = time.Now().Add(ttl)
 

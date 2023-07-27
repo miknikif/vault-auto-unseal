@@ -92,3 +92,14 @@ func DeletePolicyModel(condition interface{}) error {
 	l.Debug("Finished delete the PolicyModel from the DB", condition)
 	return err
 }
+
+// Function executed if DB is just created
+func SeedDB(c *common.Config) error {
+	if err := SaveOne(NewRootPolicy()); err != nil {
+		return err
+	}
+	if err := SaveOne(NewDefaultPolicy()); err != nil {
+		return err
+	}
+	return nil
+}

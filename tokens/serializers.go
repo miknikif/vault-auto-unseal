@@ -21,7 +21,8 @@ type TokenResponse struct {
 	ExplicitMaxTTL            int      `json:"explicit_max_ttl"`
 	ExternalNamespacePolicies string   `json:"external_namespace_policies"`
 	IdentityPolicies          []string `json:"identity_policies"`
-	Meta                      string   `json:"meta"`
+	IssueTime                 string   `json:"issue_time"`
+	Meta                      *string  `json:"meta"`
 	NumUses                   int      `json:"num_uses"`
 	Orphan                    bool     `json:"orphan"`
 	Path                      string   `json:"path"`
@@ -29,6 +30,9 @@ type TokenResponse struct {
 	Renewable                 bool     `json:"renewable"`
 	TTL                       int      `json:"ttl"`
 	Type                      string   `json:"type"`
+	Period                    int      `json:"period,omitempty"`
+	LastRenewalTime           int      `json:"last_renewal_time,omitempty"`
+	LastRenewal               string   `json:"last_renewal,omitempty"`
 }
 
 func (s *TokenSerializer) Response() TokenResponse {
@@ -43,10 +47,19 @@ func (s *TokenSerializer) Response() TokenResponse {
 		p = append(p, policy.Name)
 	}
 
+	remainingTTL, _ := GetRemainingTTL(s.TokenModel)
+	lastRenewalTime := int(s.LastRenewalTime.Unix())
+	lastRenewal := s.LastRenewalTime.UTC().Format(time.RFC3339Nano)
+
+	if s.LastRenewalTime.Unix() < 1 {
+		lastRenewalTime = 0
+		lastRenewal = ""
+	}
+
 	response := TokenResponse{
 		TokenID:                   s.TokenID,
 		Accessor:                  s.Accessor,
-		CreationTime:              s.CreationTime,
+		CreationTime:              int(s.CreationTime.Unix()),
 		CreationTTL:               s.CreationTTL,
 		DisplayName:               s.DisplayName,
 		EntityID:                  s.EntityID,
@@ -54,14 +67,18 @@ func (s *TokenSerializer) Response() TokenResponse {
 		ExplicitMaxTTL:            s.ExplicitMaxTTL,
 		ExternalNamespacePolicies: s.ExternalNamespacePolicies,
 		IdentityPolicies:          ip,
+		IssueTime:                 s.CreationTime.UTC().Format(time.RFC3339Nano),
 		Meta:                      s.Meta,
 		NumUses:                   s.NumUses,
 		Orphan:                    s.Orphan,
 		Path:                      s.Path,
 		Policies:                  p,
 		Renewable:                 s.Renewable,
-		TTL:                       s.CreationTTL - (int(time.Now().Unix()) - s.CreationTime),
+		TTL:                       remainingTTL,
+		Period:                    s.Period,
 		Type:                      s.Type,
+		LastRenewalTime:           lastRenewalTime,
+		LastRenewal:               lastRenewal,
 	}
 	return response
 }

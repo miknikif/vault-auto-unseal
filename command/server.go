@@ -12,14 +12,33 @@ import (
 	"github.com/miknikif/vault-auto-unseal/tokens"
 )
 
+// Seed DB
+func Seed(c *common.Config) error {
+	c.Logger.Info("Seeding DB")
+	if err := policies.SeedDB(c); err != nil {
+		return err
+	}
+	if err := tokens.SeedDB(c); err != nil {
+		return err
+	}
+	c.Logger.Info("Seeding completed")
+	return nil
+}
+
 // Migrate provided DB
-func Migrate(c *common.Config) {
+func Migrate(c *common.Config) error {
 	c.Logger.Info(fmt.Sprintf("Migrating %s", c.Args.DBName))
 	c.DB.AutoMigrate(&keys.AESKeyModel{})
 	c.DB.AutoMigrate(&keys.KeyModel{})
 	c.DB.AutoMigrate(&policies.PolicyModel{})
 	c.DB.AutoMigrate(&tokens.TokenModel{})
 	c.Logger.Info(fmt.Sprintf("Migration of the %s DB completed", c.Args.DBName))
+	if c.DBStatus == common.INIT_DB_RES_CREATED {
+		if err := Seed(c); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Start HTTP Server
@@ -28,7 +47,9 @@ func StartHttpServer() error {
 	if err != nil {
 		return err
 	}
-	Migrate(c)
+	if err := Migrate(c); err != nil {
+		return err
+	}
 	defer c.DB.Close()
 
 	if c.Args.IsProduction {
@@ -40,6 +61,7 @@ func StartHttpServer() error {
 	v1 := router.Group("/v1")
 	v1.Use(common.JSONMiddleware(false))
 	v1.Use(common.RequestIDMiddleware())
+	v1.Use(tokens.AuthMiddleware())
 	tokens.TokenRegister(v1.Group("/auth/token"))
 	sys.HealthRegister(v1.Group("/sys"))
 	policies.PolicyRegister(v1.Group("/sys/policy"))

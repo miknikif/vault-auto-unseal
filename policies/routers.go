@@ -51,6 +51,10 @@ func PolicyRetrieve(c *gin.Context) {
 
 func PolicyCreateOrUpdate(c *gin.Context) {
 	name := c.Param("name")
+	if name == "root" {
+		c.JSON(http.StatusBadRequest, common.NewError("policy", errors.New("Root policy update is forbidden")))
+		return
+	}
 	policyModel, err := FindOnePolicy(&PolicyModel{Name: name})
 	if err != nil {
 		policyModel = PolicyModel{Name: name}
@@ -79,9 +83,13 @@ func PolicyCreateOrUpdate(c *gin.Context) {
 
 func PolicyDelete(c *gin.Context) {
 	name := c.Param("name")
+	if name == "root" || name == "default" {
+		c.JSON(http.StatusBadRequest, common.NewError("policy", errors.New("Deletion of the root and default policies are forbidden")))
+		return
+	}
 	err := DeletePolicyModel(&PolicyModel{Name: name})
 	if err != nil {
-		c.JSON(http.StatusNotFound, common.NewError("policy", errors.New("Invalid policy name")))
+		c.JSON(http.StatusNotFound, common.NewError("policy", errors.New("invalid policy name")))
 		return
 	}
 	c.JSON(http.StatusOK, common.NewGenericResponse(c, common.NewStatusResponse(http.StatusOK, "ok")))

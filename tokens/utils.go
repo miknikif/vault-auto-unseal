@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"time"
+
+	"github.com/miknikif/vault-auto-unseal/policies"
 )
 
 func NewToken(tokenType string) (string, error) {
@@ -35,4 +38,29 @@ func NewAccessor() (string, error) {
 	accessor := base64.StdEncoding.EncodeToString(b)
 
 	return accessor, nil
+}
+
+func GetRemainingTTL(token TokenModel) (int, error) {
+	if token.CreationTTL == 0 {
+		return 0, nil
+	}
+	return int(token.ExpireTime.Unix() - time.Now().Unix()), nil
+}
+
+func NewRootToken() *TokenModel {
+	token, _ := NewToken(TOKEN_TYPE_SERVICE)
+	accessor, _ := NewAccessor()
+	return &TokenModel{
+		TokenID:  token,
+		Accessor: accessor,
+		Policies: []policies.PolicyModel{
+			{
+				Name: "root",
+			},
+		},
+		CreationTime:   time.Now(),
+		CreationTTL:    0,
+		ExplicitMaxTTL: 0,
+		Period:         0,
+	}
 }

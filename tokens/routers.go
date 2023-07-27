@@ -10,12 +10,17 @@ import (
 
 func TokenRegister(router *gin.RouterGroup) {
 	router.POST("/create", TokenCreate)
+	router.POST("/renew", TokenRenew)
+	router.PUT("/renew", TokenRenew)
+	router.POST("/renew-accessor", TokenRenew)
+	router.GET("/lookup-self", TokenSelfRetrieve)
 	router.POST("/lookup", TokenRetrieve)
 	router.POST("/lookup-accessor", TokenRetrieve)
+	router.POST("/revoke", TokenDelete)
+	router.PUT("/revoke", TokenDelete)
+	router.POST("/revoke-accessor", TokenDelete)
 }
 
-// {"ttl":"0s","explicit_max_ttl":"0s","period":"0s","display_name":"","num_uses":0,"renewable":true,"type":"service","entity_alias":""}
-// {"policies":["default"],"ttl":"0s","explicit_max_ttl":"0s","period":"24h0m0s","display_name":"","num_uses":0,"renewable":true,"type":"service","entity_alias":""}
 func TokenCreate(c *gin.Context) {
 	l, _ := common.GetLogger()
 	tokenModelValidator := NewTokenModelValidator()
@@ -32,9 +37,33 @@ func TokenCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, common.NewGenericResponse(c, serializer.Response()))
 }
 
-func TokenRetrieve(c *gin.Context) {
+func TokenRenew(c *gin.Context) {
 	l, _ := common.GetLogger()
-	tokenLookupModelValidator := NewTokenLookupModelValidator()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(false)
+	if err := tokenLookupModelValidator.Bind(c); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	tokenModel, err := FindOneToken(&tokenLookupModelValidator.tokenModel)
+	l.Debug("Retrieved token:", "token", tokenModel, "err", err)
+	if err != nil {
+		c.JSON(http.StatusNotFound, common.NewError("tokens", errors.New("Specified token not found")))
+		return
+	}
+	if err := tokenModel.Renew(); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	if tokenLookupModelValidator.findWithAccessor {
+		tokenModel.TokenID = ""
+	}
+	serializer := TokenSerializer{C: c, TokenModel: tokenModel}
+	c.JSON(http.StatusOK, common.NewGenericResponse(c, serializer.Response()))
+}
+
+func TokenSelfRetrieve(c *gin.Context) {
+	l, _ := common.GetLogger()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(true)
 	if err := tokenLookupModelValidator.Bind(c); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
 		return
@@ -50,4 +79,46 @@ func TokenRetrieve(c *gin.Context) {
 	}
 	serializer := TokenSerializer{C: c, TokenModel: tokenModel}
 	c.JSON(http.StatusOK, common.NewGenericResponse(c, serializer.Response()))
+}
+
+func TokenRetrieve(c *gin.Context) {
+	l, _ := common.GetLogger()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(false)
+	if err := tokenLookupModelValidator.Bind(c); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	tokenModel, err := FindOneToken(&tokenLookupModelValidator.tokenModel)
+	l.Debug("Retrieved token:", "token", tokenModel, "err", err)
+	if err != nil {
+		c.JSON(http.StatusNotFound, common.NewError("tokens", errors.New("Specified token not found")))
+		return
+	}
+	if tokenLookupModelValidator.findWithAccessor {
+		tokenModel.TokenID = ""
+	}
+	serializer := TokenSerializer{C: c, TokenModel: tokenModel}
+	c.JSON(http.StatusOK, common.NewGenericResponse(c, serializer.Response()))
+}
+
+func TokenDelete(c *gin.Context) {
+	l, _ := common.GetLogger()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(false)
+	if err := tokenLookupModelValidator.Bind(c); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	tokenModel, err := FindOneToken(&tokenLookupModelValidator.tokenModel)
+	l.Debug("TokenDelete: found existing token", "token", tokenModel)
+	if err != nil {
+		c.JSON(http.StatusOK, common.NewGenericResponse(c, nil))
+		return
+	}
+	if err := DeleteTokenModel(&tokenModel); err != nil {
+		l.Debug("TokenDelete: unable to delete the token", "token", tokenModel, "err", err)
+		c.JSON(http.StatusOK, common.NewGenericResponse(c, nil))
+		return
+	}
+	l.Debug("TokenDelete: token deleted")
+	c.JSON(http.StatusNoContent, nil)
 }

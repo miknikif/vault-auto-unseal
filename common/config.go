@@ -3,7 +3,6 @@ package common
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -61,11 +60,12 @@ type TLSConfig struct {
 
 // App Config Struct
 type Config struct {
-	Lock   sync.RWMutex
-	Args   *Params
-	TLS    *TLSConfig
-	Logger hclog.Logger
-	DB     *gorm.DB
+	Lock     sync.RWMutex
+	Args     *Params
+	TLS      *TLSConfig
+	Logger   hclog.Logger
+	DBStatus int
+	DB       *gorm.DB
 }
 
 var c *Config
@@ -220,37 +220,10 @@ func (c *Config) readEnv() error {
 	return nil
 }
 
-// Create db file if it doesn't exist
-func CreateDBIfNotExists(c *Config) error {
-	c.Logger.Debug(fmt.Sprintf("Checking if DB at the following path %s/%s exists", c.Args.DBPath, c.Args.DBName))
-	_, err := os.Stat(fmt.Sprintf("%s/%s", c.Args.DBPath, c.Args.DBName))
-
-	if err == nil {
-		return nil
-	}
-
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-
-	c.Logger.Warn(fmt.Sprintf("Creating new sqlite3 DB at the following path %s/%s because it doesn't exist", c.Args.DBPath, c.Args.DBName))
-	err = os.MkdirAll(c.Args.DBPath, 0755)
-	if err != nil {
-		return err
-	}
-	_, err = os.Create(fmt.Sprintf("%s/%s", c.Args.DBPath, c.Args.DBName))
-	if err != nil {
-		return err
-	}
-	c.Logger.Debug(fmt.Sprintf("Created new sqlite3 DB at the following path %s/%s because it doesn't exist", c.Args.DBPath, c.Args.DBName))
-
-	return nil
-}
-
 // Get DB object
-func (c *Config) getDB() *gorm.DB {
-	return c.DB
-}
+// func (c *Config) getDB() *gorm.DB {
+// 	return c.DB
+// }
 
 // Init default Config struct
 func DefaultConfig() (*Config, error) {
