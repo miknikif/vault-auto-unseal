@@ -22,6 +22,10 @@ func TokenRegister(router *gin.RouterGroup) {
 }
 
 func TokenCreate(c *gin.Context) {
+	if allowed := common.VerifyCreateAccess(c); !allowed {
+		c.JSON(http.StatusForbidden, common.NewError("auth", errors.New("permission denied")))
+		return
+	}
 	l, _ := common.GetLogger()
 	tokenModelValidator := NewTokenModelValidator()
 	if err := tokenModelValidator.Bind(c); err != nil {

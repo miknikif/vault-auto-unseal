@@ -5,13 +5,33 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 )
 
+// Context keys
+const (
+	VAULT_TOKEN_HEADER = "X-Vault-Token"
+	VAULT_TOKEN        = "vaultToken"
+	VAULT_TOKEN_MODEL  = "vaultTokenModel"
+	SESSION_POLICIES   = "sessionPolicies"
+	PATH_CAPABILITIES  = "pathCapabilities"
+	IS_ROOT            = "isRoot"
+)
+
 // All currently used ENV VARS
 // Used in the following form: <ENV_PREFIX>_<ENV_VAR>
+
+func TrimPrefix(s string, pref string) string {
+	return strings.TrimPrefix(s, pref)
+}
+
+func GetRequestPath(c *gin.Context) string {
+	path := c.FullPath()
+	return TrimPrefix(path, "/v1/")
+}
 
 // Helper function to check if file exists
 func fileExists(path string) bool {
@@ -114,4 +134,16 @@ func DecFromB64(str string) (string, error) {
 
 	res := string(b)
 	return res, nil
+}
+
+// Verify create acces on individual path
+func VerifyCreateAccess(c *gin.Context) bool {
+	l, _ := GetLogger()
+	isRoot := c.MustGet(IS_ROOT).(bool)
+	l.Debug("VerifyCreateAccess", "isRoot", isRoot)
+	if isRoot {
+		return true
+	}
+	capabilities := c.MustGet(PATH_CAPABILITIES).(map[string]bool)
+	return capabilities["create"]
 }

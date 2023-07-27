@@ -25,7 +25,7 @@ func (s *TokenLookupModelValidator) Bind(c *gin.Context) error {
 			return err
 		}
 	} else {
-		s.TokenID = c.GetString(VAULT_TOKEN)
+		s.TokenID = c.GetString(common.VAULT_TOKEN)
 	}
 
 	s.tokenModel.TokenID = s.TokenID
@@ -115,7 +115,7 @@ func (s *TokenModelValidator) Bind(c *gin.Context) error {
 	s.tokenModel.Type = strings.ToLower(s.Type)
 	s.tokenModel.EntityID = s.EntityAlias
 	s.tokenModel.CreationTime = time.Now()
-	s.tokenModel.Path = c.FullPath()
+	s.tokenModel.Path = common.GetRequestPath(c)
 	s.tokenModel.ExpireTime = time.Now().Add(ttl)
 
 	if s.tokenModel.TokenID == "" {

@@ -25,7 +25,7 @@ func (s *PolicyModelValidator) Bind(c *gin.Context) error {
 		return errors.New("policy - name or policy text is empty")
 	}
 
-	if _, err := parseHCLPolicy(s.Text); err != nil {
+	if _, err := ParseHCLPolicy(s.Text); err != nil {
 		return err
 	}
 

@@ -21,3 +21,15 @@ func NewDefaultPolicy() *PolicyModel {
 		Text: common.EncToB64(policyText),
 	}
 }
+
+func GetCapabilitiesFromBitmap(bitmap uint32) map[string]bool {
+	return map[string]bool{
+		DenyCapability:   bitmap&DenyCapabilityInt > 0,
+		SudoCapability:   bitmap&SudoCapabilityInt > 0,
+		CreateCapability: bitmap&CreateCapabilityInt > 0,
+		UpdateCapability: bitmap&UpdateCapabilityInt > 0,
+		ReadCapability:   bitmap&ReadCapabilityInt > 0,
+		ListCapability:   bitmap&ListCapabilityInt > 0,
+		DeleteCapability: bitmap&DeleteCapabilityInt > 0,
+	}
+}

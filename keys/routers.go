@@ -17,6 +17,10 @@ func KeysRegister(router *gin.RouterGroup) {
 }
 
 func KeyCreate(c *gin.Context) {
+	if allowed := common.VerifyCreateAccess(c); !allowed {
+		c.JSON(http.StatusForbidden, common.NewError("auth", errors.New("permission denied")))
+		return
+	}
 	keyModelValidator := NewKeyModelValidator()
 	if err := keyModelValidator.Bind(c); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, common.NewError("keys", err))

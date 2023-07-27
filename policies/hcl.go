@@ -139,7 +139,7 @@ func parsePaths(result *HCLPolicy, list *ast.ObjectList) error {
 	return nil
 }
 
-func parseHCLPolicy(src string) (*HCLPolicy, error) {
+func ParseHCLPolicy(src string) (*HCLPolicy, error) {
 	l, err := common.GetLogger()
 	if err != nil {
 		return nil, err
@@ -177,6 +177,6 @@ func parseHCLPolicy(src string) (*HCLPolicy, error) {
 		}
 	}
 
-	l.Debug("Parsed policy", p)
+	l.Debug("Parsed policy", "hcl_policy", p)
 	return &p, nil
 }

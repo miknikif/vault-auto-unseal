@@ -50,6 +50,10 @@ func PolicyRetrieve(c *gin.Context) {
 }
 
 func PolicyCreateOrUpdate(c *gin.Context) {
+	if allowed := common.VerifyCreateAccess(c); !allowed {
+		c.JSON(http.StatusForbidden, common.NewError("auth", errors.New("permission denied")))
+		return
+	}
 	name := c.Param("name")
 	if name == "root" {
 		c.JSON(http.StatusBadRequest, common.NewError("policy", errors.New("Root policy update is forbidden")))
