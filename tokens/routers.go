@@ -13,6 +13,7 @@ func TokenRegister(router *gin.RouterGroup) {
 	router.POST("/renew", TokenRenew)
 	router.PUT("/renew", TokenRenew)
 	router.POST("/renew-accessor", TokenRenew)
+	router.PUT("/renew-self", TokenSelfRenew)
 	router.GET("/lookup-self", TokenSelfRetrieve)
 	router.POST("/lookup", TokenRetrieve)
 	router.POST("/lookup-accessor", TokenRetrieve)
@@ -44,6 +45,30 @@ func TokenCreate(c *gin.Context) {
 func TokenRenew(c *gin.Context) {
 	l, _ := common.GetLogger()
 	tokenLookupModelValidator := NewTokenLookupModelValidator(false)
+	if err := tokenLookupModelValidator.Bind(c); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	tokenModel, err := FindOneToken(&tokenLookupModelValidator.tokenModel)
+	l.Debug("Retrieved token:", "token", tokenModel, "err", err)
+	if err != nil {
+		c.JSON(http.StatusNotFound, common.NewError("tokens", errors.New("Specified token not found")))
+		return
+	}
+	if err := tokenModel.Renew(); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
+		return
+	}
+	if tokenLookupModelValidator.findWithAccessor {
+		tokenModel.TokenID = ""
+	}
+	serializer := TokenSerializer{C: c, TokenModel: tokenModel}
+	c.JSON(http.StatusOK, common.NewGenericResponse(c, serializer.Response()))
+}
+
+func TokenSelfRenew(c *gin.Context) {
+	l, _ := common.GetLogger()
+	tokenLookupModelValidator := NewTokenLookupModelValidator(true)
 	if err := tokenLookupModelValidator.Bind(c); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, common.NewError("tokens", err))
 		return

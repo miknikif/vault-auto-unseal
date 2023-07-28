@@ -28,10 +28,10 @@ func Seed(c *common.Config) error {
 // Migrate provided DB
 func Migrate(c *common.Config) error {
 	c.Logger.Info(fmt.Sprintf("Migrating %s", c.Args.DBName))
-	c.DB.AutoMigrate(&keys.AESKeyModel{})
-	c.DB.AutoMigrate(&keys.KeyModel{})
 	c.DB.AutoMigrate(&policies.PolicyModel{})
 	c.DB.AutoMigrate(&tokens.TokenModel{})
+	c.DB.AutoMigrate(&keys.AESKeyModel{})
+	c.DB.AutoMigrate(&keys.KeyModel{})
 	c.Logger.Info(fmt.Sprintf("Migration of the %s DB completed", c.Args.DBName))
 	if c.DBStatus == common.INIT_DB_RES_CREATED {
 		if err := Seed(c); err != nil {
@@ -66,7 +66,7 @@ func StartHttpServer() error {
 	sys.HealthRegister(v1.Group("/sys"))
 	policies.PolicyRegister(v1.Group("/sys/policy"))
 	policies.PolicyRegister(v1.Group("/sys/policies/acl"))
-	keys.KeysRegister(v1.Group("/transit/keys"))
+	keys.KeysOperationsRegister(v1.Group("/transit"))
 
 	server := &http.Server{
 		Addr:     fmt.Sprintf("%s:%d", c.Args.Host, c.Args.Port),

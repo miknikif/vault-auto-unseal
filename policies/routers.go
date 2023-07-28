@@ -18,6 +18,10 @@ func PolicyRegister(router *gin.RouterGroup) {
 }
 
 func PolicyList(c *gin.Context) {
+	if allowed := common.VerifyListAccess(c); !allowed {
+		c.JSON(http.StatusForbidden, common.NewError("auth", errors.New("permission denied")))
+		return
+	}
 	l, _ := common.GetLogger()
 	list, err := strconv.ParseBool(c.Query("list"))
 	if err != nil {

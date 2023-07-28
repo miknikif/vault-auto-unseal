@@ -29,7 +29,7 @@ func TrimPrefix(s string, pref string) string {
 }
 
 func GetRequestPath(c *gin.Context) string {
-	path := c.FullPath()
+	path := c.Request.URL.Path
 	return TrimPrefix(path, "/v1/")
 }
 
@@ -58,6 +58,26 @@ func readEnv(key string, def string) string {
 	}
 
 	return v
+}
+
+// Parse Int - parsing integers from strings
+// If error is received during parsing process it'll return the default value
+func ParseInt(str string, def int) int {
+	i, err := strconv.Atoi(str)
+	if err != nil {
+		i = def
+	}
+	return i
+}
+
+// Parse Int - parsing integers from strings
+// If error is received during parsing process it'll return the default value
+func ParseBool(str string, def bool) bool {
+	b, err := strconv.ParseBool(str)
+	if err != nil {
+		b = def
+	}
+	return b
 }
 
 // Helper function to read INT parameter from the ENV
@@ -121,18 +141,41 @@ func Bind(c *gin.Context, obj interface{}) error {
 }
 
 func EncToB64(str string) string {
+	l, _ := GetLogger()
+	l.Debug("EncToB64 - started", "str", str)
 	src := []byte(str)
 	res := base64.StdEncoding.EncodeToString(src)
+	l.Debug("EncToB64 - ended", "res", res)
 	return res
 }
 
 func DecFromB64(str string) (string, error) {
-	b, err := base64.StdEncoding.DecodeString(str)
+	l, _ := GetLogger()
+	l.Debug("DecFromB64 - started", "str", str)
+
+	res := make([]byte, base64.StdEncoding.DecodedLen(len(str)))
+
+	n, err := base64.StdEncoding.Decode(res, []byte(str))
 	if err != nil {
 		return "", err
 	}
 
-	res := string(b)
+	l.Debug("DecFromB64 - ended", "res", string(res[:n]))
+	return string(res[:n]), nil
+}
+
+func DecBytesFromB64(str string) ([]byte, error) {
+	l, _ := GetLogger()
+	l.Debug("DecBytesFromB64 - started", "str", str)
+
+	res := make([]byte, base64.StdEncoding.DecodedLen(len(str)))
+
+	n, err := base64.StdEncoding.Decode(res, []byte(str))
+	if err != nil {
+		return []byte{}, err
+	}
+
+	l.Debug("DecBytesFromB64 - ended", "res", string(res[:n]))
 	return res, nil
 }
 
@@ -146,4 +189,16 @@ func VerifyCreateAccess(c *gin.Context) bool {
 	}
 	capabilities := c.MustGet(PATH_CAPABILITIES).(map[string]bool)
 	return capabilities["create"]
+}
+
+// Verify create acces on individual path
+func VerifyListAccess(c *gin.Context) bool {
+	l, _ := GetLogger()
+	isRoot := c.MustGet(IS_ROOT).(bool)
+	l.Debug("VerifyListAccess", "isRoot", isRoot)
+	if isRoot {
+		return true
+	}
+	capabilities := c.MustGet(PATH_CAPABILITIES).(map[string]bool)
+	return capabilities["list"]
 }

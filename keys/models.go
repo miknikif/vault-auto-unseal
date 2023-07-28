@@ -1,6 +1,9 @@
 package keys
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/miknikif/vault-auto-unseal/common"
 )
@@ -14,9 +17,9 @@ const (
 type AESKeyModel struct {
 	gorm.Model
 	KeyID   uint
-	Name    string `gorm:"uniqueIndex:keynamever;"`
-	Version int    `gorm:"uniqueIndex:keynamever;"`
-	AESKey  string
+	Name    int
+	Version int `gorm:"uniqueIndex:keynamever;"`
+	AESKey  AESKey
 }
 
 type KeyModel struct {
@@ -24,7 +27,7 @@ type KeyModel struct {
 	KeyID                uint
 	Name                 string
 	Type                 KeyType
-	Keys                 []AESKeyModel `gorm:"foreignKey:KeyID"`
+	Keys                 []AESKeyModel `gorm:"foreignKey:KeyID;constraint:OnDelete:CASCADE;"`
 	AllowPlaintextBackup bool
 	AutoRotatePeriod     int
 	DeletionAllowed      bool
@@ -41,17 +44,57 @@ type KeyModel struct {
 	SupportsSigning      bool
 }
 
-func (model *KeyModel) Update(data interface{}) error {
+type AESPayload struct {
+	Plaintext string
+	Pref      string
+	Version   int
+	Payload   string
+}
+
+func (s *AESPayload) validatePlaintext() error {
+	l, _ := common.GetLogger()
+	l.Debug("AESPayload.validatePlaintext - started", "self", s)
+	if s.Plaintext == "" {
+		return errors.New("plaintext is empty")
+	}
+	if _, err := common.DecFromB64(s.Plaintext); err != nil {
+		return errors.New("plaintext should be b64 encoded")
+	}
+	l.Debug("AESPayload.validatePlaintext - ended", "self", s)
+	return nil
+}
+
+func (s *AESPayload) validateCiphertext() error {
+	if s.Pref == "" {
+		return errors.New("ciphertext prefix is empty")
+	}
+	if s.Version == 0 {
+		return errors.New("wrong ciphertext version specified")
+	}
+	if s.Payload == "" {
+		return errors.New("ciphertext is empty")
+	}
+	return nil
+}
+
+func (s *AESPayload) getCiphertext() (string, error) {
+	if err := s.validateCiphertext(); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:v%d:%s", s.Pref, s.Version, s.Payload), nil
+}
+
+func (s *KeyModel) Update(data interface{}) error {
 	l, err := common.GetLogger()
 	if err != nil {
 		return err
 	}
-	l.Debug("Updating KeyModel")
+	l.Debug("Updating KeyModel", "data", data)
 	db, err := common.GetDB()
 	if err != nil {
 		return err
 	}
-	err = db.Model(model).Update(data).Error
+	err = db.Model(s).Update(data).Error
 	return err
 }
 
@@ -69,51 +112,6 @@ func SaveOne(data interface{}) error {
 	return err
 }
 
-func FindOneAESKey(condition interface{}) (AESKeyModel, error) {
-	var model AESKeyModel
-	l, err := common.GetLogger()
-	if err != nil {
-		return model, err
-	}
-	l.Debug("Starting retrieval of the AESKeyModel from the DB")
-	db, err := common.GetDB()
-	if err != nil {
-		return model, err
-	}
-	tx := db.Begin()
-	tx.Where(condition).First(&model)
-	err = tx.Commit().Error
-	l.Debug("Finished retrieval of the AESKeyModel from the DB")
-	return model, err
-}
-
-// func FindManyAESKey(name string, limit int, offset int) ([]AESKeyModel, int, error) {
-// 	var models []AESKeyModel
-//     var model AESKeyModel
-// 	var count int
-// 	if name == "" {
-// 		return models, count, errors.New("Key name should be specified, but received empty name")
-// 	}
-// 	c, err := common.GetConfig()
-// 	if err != nil {
-// 		return models, count, err
-// 	}
-// 	c.Logger.Debug("Starting retrieval of the AESKeyModels from the DB")
-// 	db := c.DB
-// 	tx := db.Begin()
-//
-//     tx.Where(AESKeyModel{Name: name}).First(&model)
-//
-//     if model.KeyID != 0 {
-//         count = tx.Model(&model)
-//     }
-//
-// 	tx.Where(condition).First(&model)
-// 	err = tx.Commit().Error
-// 	c.Logger.Debug("Finished retrieval of the AESKeyModels from the DB")
-// 	return model, err
-// }
-
 func FindOneKey(condition interface{}) (KeyModel, error) {
 	var model KeyModel
 	l, err := common.GetLogger()
@@ -125,12 +123,27 @@ func FindOneKey(condition interface{}) (KeyModel, error) {
 	if err != nil {
 		return model, err
 	}
-	tx := db.Begin()
-	tx.Where(condition).First(&model)
-	tx.Model(&model).Related(&model.Keys, "Keys")
-	err = tx.Commit().Error
+	err = db.Where(condition).Preload("Keys").First(&model).Error
 	l.Debug("Finished retrieval of the KeyModel from the DB")
 	return model, err
+}
+
+func FindManyKeys() ([]KeyModel, int64, error) {
+	var models []KeyModel
+	var count int64
+	l, err := common.GetLogger()
+	if err != nil {
+		return models, count, err
+	}
+	l.Debug("Starting retrieval of the all KeyModels from the DB")
+	db, err := common.GetDB()
+	if err != nil {
+		return models, count, err
+	}
+	res := db.Find(&models)
+	count = res.RowsAffected
+	err = res.Error
+	return models, count, err
 }
 
 func DeleteAESKeyModel(condition interface{}) error {

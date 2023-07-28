@@ -85,10 +85,11 @@ func validateOperation(c *gin.Context) (bool, error) {
 	hclPolicies := []policies.HCLPolicy{}
 	for _, policy := range tokenModel.Policies {
 		if policy.Name == "root" {
+			l.Trace("Found Root policy attached, skipping auth", "policy", policy)
 			c.Set(common.IS_ROOT, true)
 			return true, nil
 		}
-		policyModel, err := policies.FindOnePolicy(&policies.PolicyModel{Name: policy.Name})
+		policyModel, err := policies.FindOnePolicy(&policy)
 		if err != nil {
 			return false, errors.New("Unable to retrieve policy")
 		}
