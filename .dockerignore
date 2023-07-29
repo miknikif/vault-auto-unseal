@@ -2,3 +2,8 @@
 Dockerfile
 .DS_Store
 *.log
+*.hcl
+*.json
+tls/
+README.md
+

@@ -1,5 +1,8 @@
 # Vault transit auto unseal
 
+// TODO: update readme
+Readme is out of date a little. I did a complete rewrite of the app, so it's supports now policies/tokens/TLS etc. I'll update it soon
+
 **Warning**: Before using anything from this repo, consider the following:
 - Implementation isn't checked from the security perspective
 - A single key type supported - AES256
@@ -23,15 +26,15 @@ This small go app is mocking transit secret engine and implements endpoints requ
 	- Run builded image: `docker run -itp 8200:8200 -v <image_name>`
 	- Create a new key by running `curl -X POST http://localhost:8200/v1/transit/keys/<key_name>`
 	- Apply the following example config to your vault:
-	    ```hcl
+		```hcl
 		seal "transit" {
-          address            = "http://<ip>:8200"
-          token              = "s.Qf1s5zigZ4OX6akYjQXJC1jY" # any random token will work, it's not used
-          disable_renewal    = "true" # disable vault from trying to lookup and renew the token
-          key_name           = "<key_name>" 
-          mount_path         = "transit/"
-          tls_skip_verify    = "true" # I've not implemented TLS
-        }
+		  address			 = "http://<ip>:8200"
+		  token				 = "s.Qf1s5zigZ4OX6akYjQXJC1jY" # any random token will work, it's not used
+		  disable_renewal	 = "true" # disable vault from trying to lookup and renew the token
+		  key_name			 = "<key_name>" 
+		  mount_path		 = "transit/"
+		  tls_skip_verify	 = "true" # I've not implemented TLS
+		}
 		```
 	- Start vault and init it - `vault operator init`
 2. Binary
@@ -44,15 +47,15 @@ This small go app is mocking transit secret engine and implements endpoints requ
 	- Run compiled binary: `./vault-auto-unseal`
 	- Create a new key by running `curl -X POST http://localhost:8200/v1/transit/keys/<key_name>`
 	- Apply the following example config to your vault:
-	    ```hcl
+		```hcl
 		seal "transit" {
-          address            = "http://<ip>:8200"
-          token              = "s.Qf1s5zigZ4OX6akYjQXJC1jY" # any random token will work, it's not used
-          disable_renewal    = "true" # disable vault from trying to lookup and renew the token
-          key_name           = "<key_name>" 
-          mount_path         = "transit/"
-          tls_skip_verify    = "true" # I've not implemented TLS
-        }
+		  address			 = "http://<ip>:8200"
+		  token				 = "s.Qf1s5zigZ4OX6akYjQXJC1jY" # any random token will work, it's not used
+		  disable_renewal	 = "true" # disable vault from trying to lookup and renew the token
+		  key_name			 = "<key_name>" 
+		  mount_path		 = "transit/"
+		  tls_skip_verify	 = "true" # I've not implemented TLS
+		}
 		```
 	- Start vault and init it - `vault operator init`
 
