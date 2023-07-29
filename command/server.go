@@ -58,12 +58,13 @@ func StartHttpServer() error {
 
 	router := gin.Default()
 
+	router.Use(common.JSONMiddleware(false))
+	router.Use(common.RequestIDMiddleware())
+	sys.HealthRegister(router.Group("/v1/sys"))
+
 	v1 := router.Group("/v1")
-	v1.Use(common.JSONMiddleware(false))
-	v1.Use(common.RequestIDMiddleware())
 	v1.Use(tokens.AuthMiddleware())
 	tokens.TokenRegister(v1.Group("/auth/token"))
-	sys.HealthRegister(v1.Group("/sys"))
 	policies.PolicyRegister(v1.Group("/sys/policy"))
 	policies.PolicyRegister(v1.Group("/sys/policies/acl"))
 	keys.KeysOperationsRegister(v1.Group("/transit"))
